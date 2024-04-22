@@ -1,8 +1,10 @@
 # prm lists used in testing
 
 prm.daily = list(
-  burn = 1,
-  iter = 1,
+  method = "renewal",
+  popsize = 14.7e6,
+  burn = 5,
+  iter = 5,
   chains = 1,
   prior_R0_shape = 2,
   prior_R0_rate = 0.6,

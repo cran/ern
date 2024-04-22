@@ -4,52 +4,122 @@
 \alias{plot_diagnostic_cl}
 \title{Diagnostic plot for R estimation from clinical report data}
 \usage{
-plot_diagnostic_cl(r.estim)
+plot_diagnostic_cl(r.estim, caption = NULL, wrap.plots = TRUE)
 }
 \arguments{
 \item{r.estim}{List. Output of \code{\link[=estimate_R_cl]{estimate_R_cl()}}.}
+
+\item{caption}{String. Caption to be inserted in the plot.
+Default is \code{caption = NULL} which disables the caption.}
+
+\item{wrap.plots}{Logical. Wrap the plots together into a single ggplot object?
+If \code{wrap.plots = TRUE} (the default) will return wrapped plots in a single object,
+else will return a list of separate ggplot objects.}
 }
 \value{
-A \code{ggplot} object
+Plots of the clinical data used, the inferred daily incidence and
+Rt estimates. If \code{wrap.plots = TRUE} (the default) will return
+wrapped plots (with x-axis aligned to facilitate the comaprison)
+in a single object,
+else will return a list of separate ggplot objects.
+
+A \code{ggplot} object (or a list of ggplot objects
+if \code{wrap.plots = FALSE}).
 }
 \description{
 Diagnostic plot for R estimation from clinical report data
 }
 \examples{
 
-#' # -- THIS EXAMPLE TAKES ABOUT 30 SECONDS TO RUN --
-
-# Load SARS-CoV-2 reported cases in Ontario
-# during the Omicron wave
-data('cl.input')
-dat = cl.input[cl.input$pt == 'on' & 
-                 cl.input$date > as.Date('2021-11-30') & 
-                 cl.input$date < as.Date('2022-01-31'),] 
-
+# -- THIS EXAMPLE TAKES ABOUT 30 SECONDS TO RUN --
 # Estimate Rt
+
 \dontrun{
-x = estimate_R_cl(
-  cl.input = dat,
-  dist.repdelay = def_dist_reporting_delay(pathogen = 'sarscov2'), 
-  dist.repfrac = def_dist_reporting_fraction(),
-  dist.incub = def_dist_incubation_period(pathogen = 'sarscov2'),
-  dist.gi = def_dist_generation_interval(pathogen = 'sarscov2'),
-  popsize = 14e6, # population of Ontario in 2023
-  prm.daily = list(
-    # Very low number of MCMC iterations
-    # for this example to run fast.
-    # Increase `burn`, `iter` and `chains` 
-    # for better accuracy
-    burn = 50, iter = 50, chains = 1, 
-    # first.agg.period = NULL,
-    prior_R0_shape = 2, prior_R0_rate = 0.6, 
-    prior_alpha_shape = 1, prior_alpha_rate = 1),
-  silent = TRUE
+# Load SARS-CoV-2 reported cases in Quebec
+# during the Summer 2021
+dat <- (ern::cl.data
+    |> dplyr::filter(
+      pt == "qc", 
+      dplyr::between(date, as.Date("2021-06-01"), as.Date("2021-09-01"))
+    )
+)
+# distributions
+dist.repdelay = ern::def_dist(
+    dist = 'gamma',
+    mean = 5, 
+    mean_sd = 1,
+    sd = 1,
+    sd_sd = 0.1,
+    max = 10
+)
+dist.repfrac = ern::def_dist(
+    dist = "unif",
+    min = 0.1,
+    max = 0.3
+)
+dist.incub = ern::def_dist(
+    dist = "gamma",
+    mean = 3.49,
+    mean_sd = 0.1477,
+    shape = 8.5,
+    shape_sd = 1.8945,
+    max = 8
+)
+dist.gi = ern::def_dist(
+    dist = "gamma",
+    mean = 6,
+    mean_sd = 0.75,
+    shape = 2.4,
+    shape_sd = 0.3,
+    max = 10
+)
+
+# settings
+prm.daily <- list(
+    method = "renewal",
+    popsize = 8.5e6, # Q3 (July 1) 2022 estimate for Quebec
+    burn = 500,
+    iter = 500,
+    chains = 2,
+    prior_R0_shape = 1.1, prior_R0_rate = 0.6, 
+    prior_alpha_shape = 1, prior_alpha_rate = 1
+)
+prm.daily.check <- list(
+    agg.reldiff.tol = 10
+)
+prm.smooth <- list(
+    method = "rollmean",
+    align = "center",
+    window = 7
+)
+prm.R <- list(
+    iter = 20, 
+    CI = 0.95, 
+    window = 7, 
+    config.EpiEstim = NULL
+)
+
+x <- estimate_R_cl(
+  dat,
+  dist.repdelay,
+  dist.repfrac,
+  dist.incub,
+  dist.gi,
+  prm.daily,
+  prm.daily.check,
+  prm.smooth,
+  prm.R
 )
 
 # Diagnostic plot for Rt estimates 
 # from clinical data
-plot_diagnostic_cl(x)
+g = plot_diagnostic_cl(x)
+plot(g)
+
+g2 = plot_diagnostic_cl(x, caption = 'This is your caption', wrap.plots = FALSE)
+plot(g2$clinical_data)
+plot(g2$inferred_incidence)
+plot(g2$Rt)
 }
 
 }

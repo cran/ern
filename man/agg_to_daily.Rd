@@ -4,35 +4,44 @@
 \alias{agg_to_daily}
 \title{Infer daily counts from aggregates}
 \usage{
-agg_to_daily(cl.input, dist.gi, popsize, prm.daily, silent = FALSE)
+agg_to_daily(cl.data, dist.gi, prm.daily, silent = FALSE)
 }
 \arguments{
-\item{cl.input}{Data frame. Must have variables:
+\item{cl.data}{Data frame. Must have variables:
 \itemize{
 \item \code{date}: calendar date of report
 \item \code{value}: count of reported cases
 }}
 
-\item{dist.gi}{List. Parameters for the generation interval distribution in the same format as returned by \code{\link[=def_dist_generation_interval]{def_dist_generation_interval()}}.}
-
-\item{popsize}{Integer. Population size to use in MCMC simulation to infer daily observations from aggregated input data.}
+\item{dist.gi}{List. Parameters for the generation interval distribution in the same format as returned by \code{\link[=def_dist]{def_dist()}}.}
 
 \item{prm.daily}{List. Parameters for daily report inference via MCMC. Elements include:
 \itemize{
+\item \code{method}: String. Method name to infer the daily incidence reports from aggregated ones.
+Either \code{linear} or \code{renewal} is currently implemented.
+The \code{linear} method simply performs a linear interpolation that matches the aggregated values.
+The \code{renewal} method fits a SIR-like model using a renewal equation to infer the daily incidence.
+In this case, the fitting algorithm is a Markov Chain Monte Carlo (MCMC) implemented in JAGS
+and needs the parameters below (e.g., \code{burn,iter,chains,...}).
+The \code{renewal} method is more adapted for short single wave epidemics as this models
+i) naturally fits a single wave and ii) has longer computing time.
+For longer time series, user may perfer the \code{linear} method.
+\item \code{popsize}: Integer. Population size to use in MCMC simulation to infer daily observations from aggregated input data.
 \item \code{burn}: Numeric. Length of burn-in period (number of days).
 \item \code{iter}: Numeric. Number of iterations after burn-in period (number of days).
 \item \code{chains}: Numeric. Number of chains to simulate.
-\item \code{first.agg.period}: length of aggregation period for first aggregated observation (number of days); if NULL, assume same aggregation period as observed for second observation (gap between first and second observations)
 \item \code{prior_R0_shape}: Shape of the (hyper-)parameter for the prior Gamma distribution for R0.
 \item \code{prior_R0_rate}: Rate of the (hyper-)parameter for the prior Gamma distribution for R0.
 \item \code{prior_alpha_shape}: Shape of the (hyper-)parameter for the prior Gamma distribution for alpha.
 \item \code{prior_alpha_rate}: Rate of the (hyper-)parameter for the prior Gamma distribution for alpha.
+\item \code{first.agg.period}: length of aggregation period for first aggregated observation (number of days); if NULL, assume same aggregation period as observed for second observation (gap between first and second observations)
 }}
 
 \item{silent}{Logical. Flag to suppress all output messages, warnings, and progress bars.}
 }
 \value{
-Data frame with individual realizations of daily reported cases
+A list containing a data frame with individual realizations of
+daily reported cases and the JAGS object.
 }
 \description{
 Infer daily counts from aggregates
@@ -42,24 +51,32 @@ Infer daily counts from aggregates
 # Importing data attached to the `ern` package
 # and selecting the Omicron wave in Ontario, Canada.
 # This is *weekly* incidence.
-data(cl.input)
-data = cl.input[cl.input$pt == 'on' & 
-                  cl.input$date > as.Date('2021-11-30') & 
-                  cl.input$date < as.Date('2021-12-31'),] 
+data(cl.data)
+data = cl.data[cl.data$pt == 'on' & 
+                  cl.data$date > as.Date('2021-11-30') & 
+                  cl.data$date < as.Date('2021-12-31'),] 
 head(data)
-dist.gi = def_dist_generation_interval('sarscov2')
+dist.gi = ern::def_dist(
+ dist     = "gamma",
+ mean     = 6.84,
+ mean_sd  = 0.7486,
+ shape    = 2.39,
+ shape_sd = 0.3573,
+ max      = 15
+)
 
 a = agg_to_daily(
-cl.input = data, 
+cl.data = data, 
 dist.gi = dist.gi, 
-  popsize = 14e6, 
   prm.daily = list(
+  method = "renewal",
+  popsize = 14e6,
   # MCMC parameters.
   # small values for computation speed for this example.
   # Increase for better accuracy
   burn = 100,
   iter = 100,
-  chains = 1,
+  chains = 2,
   # - - - - - 
   prior_R0_shape = 2,
   prior_R0_rate = 0.6,
@@ -70,10 +87,14 @@ dist.gi = dist.gi,
 # have a posterior distribution of  
 # daily incidences. Here we just plot
 # one single draw:
-a1 = a[a$id==1,]
-plot(x = a1$t, y = a1$value, typ = 'o',
-     xlab = 'days', ylab = 'daily incidence',
-     main = 'Posterior daily incidence infered from weekly incidence')
       
-
+ df = a$df
+ df1 = df[df$id==1,]
+ plot(x = df1$t, y = df1$value, typ = 'o',
+      xlab = 'days', ylab = 'daily incidence',
+      main = 'Posterior daily incidence infered from weekly incidence')
+ 
+ # Extract of the parameters values from the first chain
+ a$jags.object[[1]][1:9,1:9]
+ 
 }

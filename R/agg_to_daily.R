@@ -4,7 +4,8 @@
 #'
 #' @importFrom utils capture.output
 #'
-#' @return Data frame with individual realizations of daily reported cases
+#' @return A list containing a data frame with individual realizations of 
+#' daily reported cases and the JAGS object.
 #' @export
 #' 
 #' @examples 
@@ -12,24 +13,32 @@
 #' # Importing data attached to the `ern` package
 #' # and selecting the Omicron wave in Ontario, Canada.
 #' # This is *weekly* incidence.
-#' data(cl.input)
-#' data = cl.input[cl.input$pt == 'on' & 
-#'                   cl.input$date > as.Date('2021-11-30') & 
-#'                   cl.input$date < as.Date('2021-12-31'),] 
+#' data(cl.data)
+#' data = cl.data[cl.data$pt == 'on' & 
+#'                   cl.data$date > as.Date('2021-11-30') & 
+#'                   cl.data$date < as.Date('2021-12-31'),] 
 #' head(data)
-#' dist.gi = def_dist_generation_interval('sarscov2')
+#' dist.gi = ern::def_dist(
+#'  dist     = "gamma",
+#'  mean     = 6.84,
+#'  mean_sd  = 0.7486,
+#'  shape    = 2.39,
+#'  shape_sd = 0.3573,
+#'  max      = 15
+#' )
 #' 
 #' a = agg_to_daily(
-#' cl.input = data, 
+#' cl.data = data, 
 #' dist.gi = dist.gi, 
-#'   popsize = 14e6, 
 #'   prm.daily = list(
+#'   method = "renewal",
+#'   popsize = 14e6,
 #'   # MCMC parameters.
 #'   # small values for computation speed for this example.
 #'   # Increase for better accuracy
 #'   burn = 100,
 #'   iter = 100,
-#'   chains = 1,
+#'   chains = 2,
 #'   # - - - - - 
 #'   prior_R0_shape = 2,
 #'   prior_R0_rate = 0.6,
@@ -41,16 +50,21 @@
 #' # have a posterior distribution of  
 #' # daily incidences. Here we just plot
 #' # one single draw:
-#' a1 = a[a$id==1,]
-#' plot(x = a1$t, y = a1$value, typ = 'o',
-#'      xlab = 'days', ylab = 'daily incidence',
-#'      main = 'Posterior daily incidence infered from weekly incidence')
 #'       
-#' 
+#'  df = a$df
+#'  df1 = df[df$id==1,]
+#'  plot(x = df1$t, y = df1$value, typ = 'o',
+#'       xlab = 'days', ylab = 'daily incidence',
+#'       main = 'Posterior daily incidence infered from weekly incidence')
+#'  
+#'  # Extract of the parameters values from the first chain
+#'  a$jags.object[[1]][1:9,1:9]
+#'  
+
+
 agg_to_daily <- function(
-  cl.input,
+  cl.data,
   dist.gi,
-  popsize,
   prm.daily,
   silent = FALSE
 ) {
@@ -58,23 +72,27 @@ agg_to_daily <- function(
   gi = get_discrete_dist(dist.gi)
   
   # in case the data supplied does not have a time variable
-  if( ! 't' %in% names(cl.input) ){
-    dt1 = as.integer(cl.input$date[2] - cl.input$date[1])
-    cl.input$t <-  as.integer(cl.input$date - cl.input$date[1]) + dt1
+  if( ! 't' %in% names(cl.data) ){
+    dt1 = as.integer(cl.data$date[2] - cl.data$date[1])
+    cl.data$t <-  as.integer(cl.data$date - cl.data$date[1]) + dt1
     warning('`agg_to_daily()`: time variable not supplied in data, deducting it from the dates.')
   }
 
-  df.daily.inc = fit_jags_aggreg(
+  jags.fit = fit_jags_aggreg(
     g = gi,
-    N = popsize,
-    obs.times = cl.input$t,
-    Y = cl.input$value,
+    N = prm.daily$popsize,
+    obs.times = cl.data$t,
+    Y = cl.data$value,
     prm.daily = prm.daily,
-    silent = silent) |>
+    silent = silent) 
+  
+  df.daily.inc = jags.fit |>
     reshape_fit_jags() |>
-    get_realizations(cl.input)
+    get_realizations(cl.data)
 
-  return(df.daily.inc)
+  return(list(
+    jags.object = jags.fit, 
+    df = df.daily.inc))
 }
 
 # helpers -----------------------------------------------------------------
@@ -84,16 +102,16 @@ agg_to_daily <- function(
 #' @inheritParams estimate_R_cl
 #' @keywords internal
 #' @return Data frame
-attach_t_agg <- function(cl.input, prm.daily = NULL, silent = FALSE){
+attach_t_agg <- function(cl.data, prm.daily = NULL, silent = FALSE){
 
   first.agg.period <- prm.daily$first.agg.period
 
   # Handling the first aggregation
   if(is.null(first.agg.period)){
-    fa = as.integer(cl.input$date[2]-cl.input$date[1])
+    fa = as.integer(cl.data$date[2]-cl.data$date[1])
     if(!silent){
       message(paste0("-----
-Assuming the first observed report (from ", cl.input$date[1], ")
+Assuming the first observed report (from ", cl.data$date[1], ")
 is aggregated over ", fa , " previous days
 (second observation's aggregation period).
 This can be changed in `estimate_R_cl()`, using the
@@ -110,9 +128,9 @@ in this parameter list)."))
     }
   }
 
-  date.min = min(cl.input$date)
+  date.min = min(cl.data$date)
 
-  res = cl.input |>
+  res = cl.data |>
     dplyr::mutate(t = as.numeric(date - date.min) + fa) |>
     dplyr::arrange(t)
 
@@ -234,7 +252,13 @@ Running MCMC model to infer daily reports from aggregated reports...
 
 
   # --- MCMC run
-
+  
+  if(!silent){
+    message('MCMC paramters:',
+            '\n  Number of chains   : ', prm.daily$chains,
+            '\n  Burn-in iterations : ', prm.daily$burn,
+            '\n  MCMC iterations    : ', prm.daily$iter        )
+  }
   # Burn-in period:
   n.iter = prm.daily$burn
   if(!silent) stats::update(mod, n.iter = n.iter)
@@ -250,7 +274,7 @@ Running MCMC model to infer daily reports from aggregated reports...
   if(!silent) mod_sim <- rjags::coda.samples(model = mod,
                                              variable.names = params,
                                              n.iter = n.iter)
-
+  
   return(mod_sim)
 }
 

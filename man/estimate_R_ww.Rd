@@ -23,9 +23,9 @@ estimate_R_ww(
 \item \code{value}: pathogen concentration
 }}
 
-\item{dist.fec}{List. Parameters for the fecal shedding distribution in the same format as returned by \code{\link[=def_dist_fecal_shedding]{def_dist_fecal_shedding()}}.}
+\item{dist.fec}{List. Parameters for the fecal shedding distribution in the same format as returned by \code{\link[=def_dist]{def_dist()}}.}
 
-\item{dist.gi}{List. Parameters for the generation interval distribution in the same format as returned by \code{\link[=def_dist_generation_interval]{def_dist_generation_interval()}}.}
+\item{dist.gi}{List. Parameters for the generation interval distribution in the same format as returned by \code{\link[=def_dist]{def_dist()}}.}
 
 \item{scaling.factor}{Numeric. Scaling from wastewater concentration to
 prevalence. This value may be assumed or independently calibrated to data.}
@@ -33,10 +33,10 @@ prevalence. This value may be assumed or independently calibrated to data.}
 \item{prm.smooth}{List. list of smoothing parameters. Parameters should be
 specified as followed:
 \itemize{
-\item \code{method}: smoothing method, either \code{'rollmean'} (rolling mean) or \code{'loess'} (LOESS smoothing)
+\item \code{method}: smoothing method, either \code{'rollmean'} (rolling mean) or \code{'loess'} (LOESS smoothing via \code{\link[stats:loess]{stats::loess()}})
 \item \code{window}: for \verb{method = 'rollmean} only; width of smoothing window in days
 \item \code{align}: for \verb{method = 'rollmean} only; smoothing alignment, either \code{'center'}, \code{'left'}, \code{'right'}
-\item \code{span}: for \code{method = 'loess'} only; smoothing span (see the documentation for \code{stats::loess()} for details)
+\item \code{span}: for \code{method = 'loess'} only; smoothing span (see the documentation for \code{\link[stats:loess]{stats::loess()}} for details)
 \item \code{floor}: optional call for wastewater concentration smoothing with \code{method = 'loess'} only; user defined minimum smoothing concentration
 }
 Set this entire list to \code{NULL} to turn off smoothing}
@@ -74,13 +74,27 @@ data.
 \examples{
 
  # Load data of viral concentration in wastewater
-data("ww.input")
+data("ww.data")
 
 # Run the estimation of Rt based on the wastewater data
 x = estimate_R_ww(
-  ww.conc  = ww.input,
-  dist.fec = def_dist_fecal_shedding(pathogen = 'sarscov2'),
-  dist.gi  = def_dist_generation_interval(pathogen = 'sarscov2'), 
+  ww.conc  = ww.data,
+  dist.fec = ern::def_dist(
+    dist = "gamma",
+    mean = 12.90215,
+    mean_sd = 1.136829,
+    shape = 1.759937,
+    shape_sd = 0.2665988,
+    max = 33
+    ),
+  dist.gi  = ern::def_dist(
+    dist     = "gamma",
+    mean     = 6.84,
+    mean_sd  = 0.7486,
+    shape    = 2.39,
+    shape_sd = 0.3573,
+    max      = 15
+    ), 
   silent   = TRUE
 )
 

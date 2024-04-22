@@ -30,7 +30,8 @@ devtools::install_github('phac-nml-phrsd/ern')
 ### Note on JAGS
 
 `rjags` is a dependency for `ern`, specifically for Rt calculations
-performed on clinical testing data. If you are only performing
+performed on clinical testing data using the "renewal" method for inference of the daily incidence from aggregated clinical data. 
+If you are only using the "linear" method, or performing
 calculations using wastewater data, you do not need to worry about
 installing `rjags` and can skip this section.
 
@@ -89,3 +90,13 @@ citation('ern')
 #>     url = {https://github.com/phac-nml-phrsd/ern},
 #>   }
 ```
+
+## For developers
+
+Before creating a pull request into `main`, please be sure to pull `main` in to your development branch, resolve any conflicts, and then run `devtools::check(args = c('--as-cran'))` on your development branch. Ensure that all checks pass without issue.
+
+### For CRAN udpates
+
+ - do a "check" using the `R-devel` version. Note: you also need the _latest_ `Rtools` associated with this version (download [here](https://cran.r-project.org/bin/windows/Rtools/)) 
+ - resolve _all_ errors, warnings and notes. There _might_ be false positives; communicate with CRAN in that case.
+ 

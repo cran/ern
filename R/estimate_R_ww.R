@@ -6,7 +6,7 @@
 #'  \item `date`: calendar date of wastewater collection
 #'  \item `value`: pathogen concentration
 #' }
-#' @param dist.fec List. Parameters for the fecal shedding distribution in the same format as returned by [`def_dist_fecal_shedding()`].
+#' @param dist.fec List. Parameters for the fecal shedding distribution in the same format as returned by [`def_dist()`].
 #' @template param-dist.gi
 #' @param scaling.factor Numeric. Scaling from wastewater concentration to
 #'  prevalence. This value may be assumed or independently calibrated to data.
@@ -29,13 +29,27 @@
 #' @examples 
 #'
 #'  # Load data of viral concentration in wastewater
-#' data("ww.input")
+#' data("ww.data")
 #'
 #' # Run the estimation of Rt based on the wastewater data
 #' x = estimate_R_ww(
-#'   ww.conc  = ww.input,
-#'   dist.fec = def_dist_fecal_shedding(pathogen = 'sarscov2'),
-#'   dist.gi  = def_dist_generation_interval(pathogen = 'sarscov2'), 
+#'   ww.conc  = ww.data,
+#'   dist.fec = ern::def_dist(
+#'     dist = "gamma",
+#'     mean = 12.90215,
+#'     mean_sd = 1.136829,
+#'     shape = 1.759937,
+#'     shape_sd = 0.2665988,
+#'     max = 33
+#'     ),
+#'   dist.gi  = ern::def_dist(
+#'     dist     = "gamma",
+#'     mean     = 6.84,
+#'     mean_sd  = 0.7486,
+#'     shape    = 2.39,
+#'     shape_sd = 0.3573,
+#'     max      = 15
+#'     ), 
 #'   silent   = TRUE
 #' )
 #' 
@@ -155,8 +169,19 @@ inc2R_one_iter <- function(i, dist.fec, dist.gi, ww.conc,
                            scaling.factor, prm.R, silent,
                            RL.max.iter) {
   # set.seed(i)
-  sample.fec = sample_a_dist(dist = dist.fec)
-  sample.gi  = sample_a_dist(dist = dist.gi)
+  if(dist.fec$dist != "unif"){
+    sample.fec = sample_a_dist(dist = dist.fec)
+  }
+  else if(dist.fec$dist == "unif"){
+    sample.fec = dist.fec
+  }
+  
+  if(dist.gi$dist != "unif"){
+    sample.gi  = sample_a_dist(dist = dist.gi)
+  }
+  else if(dist.gi$dist == "unif"){
+    sample.gi = dist.gi
+  }
 
   inc = deconv_ww_inc(d              = ww.conc,
                       fec            = sample.fec,

@@ -2,7 +2,9 @@
 #'
 #' @param r.estim List. Output of [estimate_R_ww()].
 #' @param caption Character. Optional plot caption.
-#'
+#' @param wrap.plots Logical. 
+#' Wrap all diagnostic plots into one single ggplot object (default = \code{TRUE}). 
+#' 
 #' @return A `ggplot` object.
 #'
 #' @export
@@ -12,22 +14,41 @@
 #' @examples 
 #' 
 #' # Load data of viral concentration in wastewater
-#' data("ww.input")
+#' data("ww.data")
 #' 
 #' # Estimate Rt based on wastewater data
 #' x = estimate_R_ww(
-#'   ww.conc  = ww.input,
-#'   dist.fec = def_dist_fecal_shedding(pathogen = 'sarscov2'),
-#'   dist.gi  = def_dist_generation_interval(pathogen = 'sarscov2'), 
+#'   ww.conc  = ww.data,
+#'   dist.fec = ern::def_dist(
+#'     dist = "gamma",
+#'     mean = 12.9,
+#'     mean_sd = 1.13,
+#'     shape = 1.75,
+#'     shape_sd = 0.26,
+#'     max = 33
+#'     ),
+#'   dist.gi  = ern::def_dist(
+#'     dist     = "gamma",
+#'     mean     = 6.84,
+#'     mean_sd  = 0.74,
+#'     shape    = 2.39,
+#'     shape_sd = 0.35,
+#'     max      = 15
+#'     ), 
 #'   silent   = TRUE
 #' )
 #' 
 #' # Diagnostic plot
 #' g = plot_diagnostic_ww(x)
 #' plot(g)
+#' 
+#' g2 = plot_diagnostic_ww(x, wrap.plots = FALSE, caption = "This is your caption")
+#' plot(g2$wastewater_data)
+#' plot(g2$inferred_incidence)
+#' plot(g2$Rt)
 #'
 #'
-plot_diagnostic_ww <- function(r.estim, caption=NULL) {
+plot_diagnostic_ww <- function(r.estim, caption=NULL, wrap.plots = TRUE) {
 
   ggplot2::theme_set(ggplot2::theme_bw())
   date.start = min(r.estim$R$date)
@@ -71,19 +92,41 @@ plot_diagnostic_ww <- function(r.estim, caption=NULL) {
     xsc +
     ggplot2::labs(title = 'Effective Reproduction Number')
 
-
-  g = patchwork::wrap_plots(g.ww, g.inc, g.r, ncol=1)
-
-  if(!is.null(caption)) g = g + ggplot2::labs(caption=caption)
-
+  if(wrap.plots){
+    g = patchwork::wrap_plots(g.ww, g.inc, g.r, ncol=1)
+    if(!is.null(caption)) g = g + ggplot2::labs(caption=caption)
+  }
+  
+  if(!wrap.plots){
+    g = list(
+      wastewater_data    = g.ww, 
+      inferred_incidence = g.inc,
+      Rt                 = g.r)
+    if(!is.null(caption)) 
+      g[['Rt']] = g[['Rt']] + ggplot2::labs(caption=caption)
+  }
+  
   return(g)
 }
 
 #' Diagnostic plot for R estimation from clinical report data
 #'
 #' @param r.estim List. Output of [estimate_R_cl()].
+#' @param caption String. Caption to be inserted in the plot. 
+#' Default is \code{caption = NULL} which disables the caption.
+#' @param wrap.plots Logical. Wrap the plots together into a single ggplot object?
+#' If \code{wrap.plots = TRUE} (the default) will return wrapped plots in a single object,
+#' else will return a list of separate ggplot objects.
 #'
-#' @return A `ggplot` object
+#' @return Plots of the clinical data used, the inferred daily incidence and
+#' Rt estimates. If \code{wrap.plots = TRUE} (the default) will return
+#' wrapped plots (with x-axis aligned to facilitate the comaprison)
+#'  in a single object,
+#' else will return a list of separate ggplot objects.
+#' 
+#' A `ggplot` object (or a list of ggplot objects
+#'  if \code{wrap.plots = FALSE}).
+#' 
 #' @export
 #'
 #' @importFrom patchwork plot_layout
@@ -92,53 +135,106 @@ plot_diagnostic_ww <- function(r.estim, caption=NULL) {
 #' @seealso [estimate_R_cl()]
 #' 
 #' 
-#' 
 #' @examples 
 #' 
-#' #' # -- THIS EXAMPLE TAKES ABOUT 30 SECONDS TO RUN --
-#' 
-#' # Load SARS-CoV-2 reported cases in Ontario
-#' # during the Omicron wave
-#' data('cl.input')
-#' dat = cl.input[cl.input$pt == 'on' & 
-#'                  cl.input$date > as.Date('2021-11-30') & 
-#'                  cl.input$date < as.Date('2022-01-31'),] 
-#' 
+#' # -- THIS EXAMPLE TAKES ABOUT 30 SECONDS TO RUN --
 #' # Estimate Rt
+#' 
 #' \dontrun{
-#' x = estimate_R_cl(
-#'   cl.input = dat,
-#'   dist.repdelay = def_dist_reporting_delay(pathogen = 'sarscov2'), 
-#'   dist.repfrac = def_dist_reporting_fraction(),
-#'   dist.incub = def_dist_incubation_period(pathogen = 'sarscov2'),
-#'   dist.gi = def_dist_generation_interval(pathogen = 'sarscov2'),
-#'   popsize = 14e6, # population of Ontario in 2023
-#'   prm.daily = list(
-#'     # Very low number of MCMC iterations
-#'     # for this example to run fast.
-#'     # Increase `burn`, `iter` and `chains` 
-#'     # for better accuracy
-#'     burn = 50, iter = 50, chains = 1, 
-#'     # first.agg.period = NULL,
-#'     prior_R0_shape = 2, prior_R0_rate = 0.6, 
-#'     prior_alpha_shape = 1, prior_alpha_rate = 1),
-#'   silent = TRUE
+#' # Load SARS-CoV-2 reported cases in Quebec
+#' # during the Summer 2021
+#' dat <- (ern::cl.data
+#'     |> dplyr::filter(
+#'       pt == "qc", 
+#'       dplyr::between(date, as.Date("2021-06-01"), as.Date("2021-09-01"))
+#'     )
+#' )
+#' # distributions
+#' dist.repdelay = ern::def_dist(
+#'     dist = 'gamma',
+#'     mean = 5, 
+#'     mean_sd = 1,
+#'     sd = 1,
+#'     sd_sd = 0.1,
+#'     max = 10
+#' )
+#' dist.repfrac = ern::def_dist(
+#'     dist = "unif",
+#'     min = 0.1,
+#'     max = 0.3
+#' )
+#' dist.incub = ern::def_dist(
+#'     dist = "gamma",
+#'     mean = 3.49,
+#'     mean_sd = 0.1477,
+#'     shape = 8.5,
+#'     shape_sd = 1.8945,
+#'     max = 8
+#' )
+#' dist.gi = ern::def_dist(
+#'     dist = "gamma",
+#'     mean = 6,
+#'     mean_sd = 0.75,
+#'     shape = 2.4,
+#'     shape_sd = 0.3,
+#'     max = 10
+#' )
+#'
+#' # settings
+#' prm.daily <- list(
+#'     method = "renewal",
+#'     popsize = 8.5e6, # Q3 (July 1) 2022 estimate for Quebec
+#'     burn = 500,
+#'     iter = 500,
+#'     chains = 2,
+#'     prior_R0_shape = 1.1, prior_R0_rate = 0.6, 
+#'     prior_alpha_shape = 1, prior_alpha_rate = 1
+#' )
+#' prm.daily.check <- list(
+#'     agg.reldiff.tol = 10
+#' )
+#' prm.smooth <- list(
+#'     method = "rollmean",
+#'     align = "center",
+#'     window = 7
+#' )
+#' prm.R <- list(
+#'     iter = 20, 
+#'     CI = 0.95, 
+#'     window = 7, 
+#'     config.EpiEstim = NULL
+#' )
+#'
+#' x <- estimate_R_cl(
+#'   dat,
+#'   dist.repdelay,
+#'   dist.repfrac,
+#'   dist.incub,
+#'   dist.gi,
+#'   prm.daily,
+#'   prm.daily.check,
+#'   prm.smooth,
+#'   prm.R
 #' )
 #' 
 #' # Diagnostic plot for Rt estimates 
 #' # from clinical data
-#' plot_diagnostic_cl(x)
+#' g = plot_diagnostic_cl(x)
+#' plot(g)
+#' 
+#' g2 = plot_diagnostic_cl(x, caption = 'This is your caption', wrap.plots = FALSE)
+#' plot(g2$clinical_data)
+#' plot(g2$inferred_incidence)
+#' plot(g2$Rt)
 #' }
 #' 
 plot_diagnostic_cl <- function(
-    r.estim
+    r.estim, caption = NULL, wrap.plots = TRUE
 ){
   
   # ==== plot setup ====
   
   alpha <- 0.3 # for CI ribbons
-  # linetype_scale <- c("dotted", "solid")
-  # names(alpha_scale) <- names(linetype_scale) <- c("FALSE", "TRUE")
   
   ggplot2::theme_set(ggplot2::theme_bw())
   
@@ -157,7 +253,7 @@ plot_diagnostic_cl <- function(
   date.range <- range(r.estim$R$date)
   
   # ==== Observed data (optionally vs inferred aggregates) ====
-  p1 <- (r.estim$cl.input
+  p1 <- (r.estim$cl.data
          |> ggplot2::ggplot(ggplot2::aes(x=date, y=value)) 
          + ggplot2::geom_col() 
          + ggplot2::labs(
@@ -242,8 +338,24 @@ plot_diagnostic_cl <- function(
          + th
   )
   
-  # ==== composite plot ====
-  g = patchwork::wrap_plots(p1,p2,p3, ncol=1, heights = heights)
+  # ==== Return plots
+  
+  if(wrap.plots){
+    g = patchwork::wrap_plots(p1, p2, p3, ncol = 1, heights = heights)
+    
+    if(!is.null(caption)) 
+      g = g + ggplot2::labs(caption=caption)
+  }
+  
+  if(!wrap.plots){
+    g = list(
+      clinical_data      = p1, 
+      inferred_incidence = p2, 
+      Rt                 = p3)
+    
+    if(!is.null(caption)) 
+      g[['Rt']] = g[['Rt']] + ggplot2::labs(caption=caption)
+  }
   
   return(g)
 }
@@ -260,7 +372,14 @@ plot_diagnostic_cl <- function(
 #' 
 #' @examples 
 #' # Define a `ern` distribution:
-#' gi  = def_dist_generation_interval(pathogen = 'influenza')
+#' gi  = ern::def_dist(
+#'   dist     = "gamma",
+#'   mean     = 6.84,
+#'   mean_sd  = 0.7486,
+#'   shape    = 2.39,
+#'   shape_sd = 0.3573,
+#'   max      = 15
+#'   )
 #' 
 #' # Plot can be customized like any `ggplot` object:
 #' g = plot_dist(gi) + ggplot2::labs(subtitle = 'your subtitle')

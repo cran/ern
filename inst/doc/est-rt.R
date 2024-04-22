@@ -16,14 +16,29 @@ suppressMessages({
 
 ## ----load sample data---------------------------------------------------------
 # Loading sample SARS-CoV-2 wastewater data
-ww.conc = ern::ww.input
+ww.conc = ern::ww.data
 
 head(ww.conc)
 
-## ----loading fec shed and gi--------------------------------------------------
-# Loading SARS-CoV-2 fecal shedding and generation interval distributions from ern
-dist.fec = ern::def_dist_fecal_shedding('sarscov2')
-dist.gi  = ern::def_dist_generation_interval(pathogen = "sarscov2")
+## ----define fec shed and gi---------------------------------------------------
+# Define SARS-CoV-2 fecal shedding and generation interval distributions
+dist.fec = ern::def_dist(
+  dist = "gamma",
+  mean = 12.90215,
+  mean_sd = 1.136829,
+  shape = 1.759937,
+  shape_sd = 0.2665988,
+  max = 33
+)
+
+dist.gi  = ern::def_dist(
+  dist     = "gamma",
+  mean     = 6.84,
+  mean_sd  = 0.7486,
+  shape    = 2.39,
+  shape_sd = 0.3573,
+  max      = 15
+)
 
 ## ----plot dist fecal, fig.width = 6-------------------------------------------
 plot_dist(dist.fec) + labs(title = paste0("Mean fecal shedding distribution (", dist.fec$dist, ")"))
@@ -67,15 +82,15 @@ g = ern::plot_diagnostic_ww(r.estim)
 plot(g)
 
 ## ----load-data----------------------------------------------------------------
-dat <- (ern::cl.input 
+dat <- (ern::cl.data 
     |> dplyr::filter(
       pt == "qc",
       dplyr::between(date, as.Date("2021-07-01"), as.Date("2021-09-01"))
 ))
 
 ## ----load-dists---------------------------------------------------------------
-# reporting delay 
-dist.repdelay = list(
+# define reporting delay 
+dist.repdelay = ern::def_dist(
   dist = 'gamma',
   mean = 5,
   mean_sd = 1,
@@ -84,21 +99,32 @@ dist.repdelay = list(
   max = 10
 )
 
-# reporting fraction 
-dist.repfrac = list(
+# define reporting fraction 
+dist.repfrac = ern::def_dist(
   dist = "unif",
   min = 0.1,
   max = 0.3
 )
 
-# incubation period
-dist.incub   = def_dist_incubation_period('sarscov2')
+# define incubation period
+dist.incub = ern::def_dist(
+  dist     = "gamma",
+  mean     = 3.49,
+  mean_sd  = 0.1477,
+  shape    = 8.5,
+  shape_sd = 1.8945,
+  max      = 8
+)
 
-# generation interval
-dist.gi      = def_dist_generation_interval('sarscov2')
-
-# population size for daily report inference
-popsize = 1e7
+# define generation interval
+dist.gi = ern::def_dist(
+  dist     = "gamma",
+  mean     = 6.84,
+  mean_sd  = 0.7486,
+  shape    = 2.39,
+  shape_sd = 0.3573,
+  max      = 15
+)
 
 ## ----plot-dist-repdelay, fig.width = 6----------------------------------------
 plot_dist(dist.repdelay) + labs(title = paste0("Mean reporting delay distribution (", dist.repdelay$dist, ")"))
@@ -112,6 +138,8 @@ plot_dist(dist.gi) + labs(title = paste0("Mean generation interval distribution 
 ## ----init-prms----------------------------------------------------------------
 # settings for daily report inference
 prm.daily = list(
+  method = "renewal",
+  popsize = 1e7, # population size
    # Here, low value for `burn` and `iter` 
    # to have a fast compilation of the vignette.
    # For real-world applications, both `burn` and `iter`
@@ -149,12 +177,11 @@ prm.R = list(
 
 ## ----est-rt-------------------------------------------------------------------
 r.estim = estimate_R_cl(
-  cl.input      = dat,
+  cl.data      = dat,
   dist.repdelay = dist.repdelay,
   dist.repfrac  = dist.repfrac,
   dist.incub    = dist.incub,
   dist.gi       = dist.gi,
-  popsize       = popsize,
   prm.daily     = prm.daily,
   prm.daily.check = prm.daily.check,
   prm.smooth    = prm.smooth,

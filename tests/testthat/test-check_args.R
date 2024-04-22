@@ -6,17 +6,36 @@ defaults <- formals(estimate_R_cl)
 # evaluate defaults
 prm.daily <- eval(defaults$prm.daily)
 
-test_that("check_prm.daily() fails when mandatory elements are missing",{
-  for(name in c("burn", "iter", "chains")){
-    expect_error(check_prm.daily(prm.daily[setdiff(names(prm.daily), name)]))
+test_that("check_prm.daily() fails when `method` is missing", {
+  prm.daily2 = prm.daily
+  prm.daily2$method <- NULL
+  expect_error(check_prm.daily(prm.daily2))
+})
+
+test_that("check_prm.daily() fails when `method` name is unknown", {
+  expect_error(check_prm.daily(purrr::list_modify(prm.daily, 
+                                                  method = "foobar")))
+})
+
+test_that("check_prm.daily() fails when `renewal` mandatory elements are missing",{
+  prm.daily2 = prm.daily
+  prm.daily2$method = 'renewal'
+  for(name in c("burn", "iter", "chains",
+                "prior_R0_shape", "prior_R0_rate",
+                "prior_alpha_shape", "prior_alpha_rate")){
+    p = prm.daily2
+    p[[name]] <- NULL
+    expect_error(check_prm.daily(p))
   }
 })
 
 test_that("check_prm.daily() fails when list items are of wrong type", {
-  expect_error(check_prm.daily(purrr::list_modify(prm.daily, burn = "2")))
-  expect_error(check_prm.daily(purrr::list_modify(prm.daily, iter = -2)))
-  expect_error(check_prm.daily(purrr::list_modify(prm.daily, chains = 0.5)))
-  expect_error(check_prm.daily(purrr::list_modify(prm.daily, first.agg.period = "-2")))
+  p = prm.daily
+  p$method <- "renewal"
+  expect_error(check_prm.daily(purrr::list_modify(p, burn = "2")))
+  expect_error(check_prm.daily(purrr::list_modify(p, iter = -2)))
+  expect_error(check_prm.daily(purrr::list_modify(p, chains = 0.5)))
+  expect_error(check_prm.daily(purrr::list_modify(p, first.agg.period = "-2")))
 })
 
 test_that("check_prm.daily() returns NULL when all checks are passed", {
@@ -226,7 +245,7 @@ test_that("check_for_deconv returns an error when number of observations <
   )
 })
 
-# cl.input ---------------------------------------------------------------
+# cl.data ---------------------------------------------------------------
 
 test_that("check_cl.input_format() returns an error when date and count columns
           are missing, and returns NULL when both columns are present in
@@ -254,7 +273,7 @@ test_that("expected output of check_df.input_daily()", {
   # logical check
   expect_equal(
     class(check_df.input_daily(
-      cl.input
+      cl.data
     )),
     "logical"
   )
@@ -262,7 +281,7 @@ test_that("expected output of check_df.input_daily()", {
   # FALSE check
   expect_false(
     check_df.input_daily(
-      cl.input
+      cl.data
     )
   )
 

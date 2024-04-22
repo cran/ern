@@ -4,12 +4,15 @@
 \alias{plot_diagnostic_ww}
 \title{Diagnostic plot for R estimation from wastewater data}
 \usage{
-plot_diagnostic_ww(r.estim, caption = NULL)
+plot_diagnostic_ww(r.estim, caption = NULL, wrap.plots = TRUE)
 }
 \arguments{
 \item{r.estim}{List. Output of \code{\link[=estimate_R_ww]{estimate_R_ww()}}.}
 
 \item{caption}{Character. Optional plot caption.}
+
+\item{wrap.plots}{Logical.
+Wrap all diagnostic plots into one single ggplot object (default = \code{TRUE}).}
 }
 \value{
 A \code{ggplot} object.
@@ -20,19 +23,38 @@ Diagnostic plot for R estimation from wastewater data
 \examples{
 
 # Load data of viral concentration in wastewater
-data("ww.input")
+data("ww.data")
 
 # Estimate Rt based on wastewater data
 x = estimate_R_ww(
-  ww.conc  = ww.input,
-  dist.fec = def_dist_fecal_shedding(pathogen = 'sarscov2'),
-  dist.gi  = def_dist_generation_interval(pathogen = 'sarscov2'), 
+  ww.conc  = ww.data,
+  dist.fec = ern::def_dist(
+    dist = "gamma",
+    mean = 12.9,
+    mean_sd = 1.13,
+    shape = 1.75,
+    shape_sd = 0.26,
+    max = 33
+    ),
+  dist.gi  = ern::def_dist(
+    dist     = "gamma",
+    mean     = 6.84,
+    mean_sd  = 0.74,
+    shape    = 2.39,
+    shape_sd = 0.35,
+    max      = 15
+    ), 
   silent   = TRUE
 )
 
 # Diagnostic plot
 g = plot_diagnostic_ww(x)
 plot(g)
+
+g2 = plot_diagnostic_ww(x, wrap.plots = FALSE, caption = "This is your caption")
+plot(g2$wastewater_data)
+plot(g2$inferred_incidence)
+plot(g2$Rt)
 
 
 }
