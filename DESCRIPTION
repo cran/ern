@@ -1,6 +1,6 @@
 Package: ern
 Title: Effective Reproduction Number Estimation
-Version: 2.0.0
+Version: 2.1.2
 Authors@R: c(
     person("David", "Champredon", , "david.champredon@canada.ca", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-7090-8757")),
@@ -23,9 +23,9 @@ RoxygenNote: 7.3.1
 Depends: R (>= 4.1.0)
 LazyData: true
 NeedsCompilation: no
-Packaged: 2024-04-22 12:48:57 UTC; user5023114
+Packaged: 2025-01-16 17:31:38 UTC; user5023114
 Author: David Champredon [aut, cre] (<https://orcid.org/0000-0002-7090-8757>),
   Warsame Yusuf [aut] (<https://orcid.org/0000-0001-5571-8122>),
   Irena Papst [aut] (<https://orcid.org/0000-0001-5901-7585>)
 Repository: CRAN
-Date/Publication: 2024-04-22 13:22:33 UTC
+Date/Publication: 2025-01-16 18:20:02 UTC
